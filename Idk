@@ -1,0 +1,142 @@
+cat > ~/setup-nvim.sh << 'SCRIPT'
+#!/usr/bin/env bash
+set -e
+
+echo "==> Installing packages"
+sudo pacman -S --needed --noconfirm neovim git base-devel ripgrep fd \
+  tree-sitter-cli rust-analyzer clangd lua-language-server
+
+echo "==> Backing up and cleaning old state"
+mkdir -p ~/.config/nvim
+[ -f ~/.config/nvim/init.lua ] && cp ~/.config/nvim/init.lua ~/.config/nvim/init.lua.bak
+rm -rf ~/.local/share/nvim ~/.local/state/nvim ~/.cache/nvim ~/.config/nvim/lazy-lock.json
+
+echo "==> Writing ~/.config/nvim/init.lua"
+cat > ~/.config/nvim/init.lua << 'EOF'
+vim.g.mapleader = " "
+
+---------------------------------------------------------------- Options
+local o = vim.opt
+o.termguicolors = false          -- follow the terminal palette
+o.background = "dark"
+o.number = true
+o.relativenumber = false         -- absolute numbers
+o.numberwidth = 4
+o.cursorline = true
+o.signcolumn = "yes"
+o.mouse = "a"
+o.clipboard = "unnamedplus"
+o.ignorecase = true
+o.smartcase = true
+o.expandtab = true
+o.shiftwidth = 4
+o.tabstop = 4
+o.smartindent = true
+o.scrolloff = 8
+o.splitright = true
+o.splitbelow = true
+o.undofile = true
+o.updatetime = 250
+o.showmode = false
+o.wrap = false
+o.completeopt = { "menu", "menuone", "noselect" }
+o.fillchars = { eob = " " }
+
+---------------------------------------------------------------- Highlights (ANSI 0-15 only)
+local function hl(g, v) vim.api.nvim_set_hl(0, g, v) end
+local function apply_hl()
+  hl("Normal",       { ctermbg = "NONE" })
+  hl("NormalNC",     { ctermbg = "NONE" })
+  hl("NormalFloat",  { ctermbg = "NONE" })
+  hl("FloatBorder",  { ctermfg = 8, ctermbg = "NONE" })
+  hl("NonText",      { ctermfg = 8, ctermbg = "NONE" })
+  hl("SignColumn",   { ctermbg = "NONE" })
+  hl("LineNr",       { ctermfg = 8, ctermbg = "NONE" })
+  hl("CursorLineNr", { ctermfg = 3, ctermbg = "NONE", cterm = { bold = true } })
+  hl("CursorLine",   { ctermbg = 0, cterm = {} })
+  hl("Visual",       { ctermbg = 8 })
+  hl("Search",       { ctermfg = 0, ctermbg = 3 })
+  hl("IncSearch",    { ctermfg = 0, ctermbg = 1 })
+  hl("Comment",      { ctermfg = 8, cterm = { italic = true } })
+  hl("StatusLine",   { ctermfg = 7, ctermbg = 0, cterm = {} })
+  hl("StatusLineNC", { ctermfg = 8, ctermbg = 0, cterm = {} })
+  hl("WinSeparator", { ctermfg = 8, ctermbg = "NONE" })
+  hl("Pmenu",        { ctermfg = 7, ctermbg = 0 })
+  hl("PmenuSel",     { ctermfg = 0, ctermbg = 4 })
+  hl("MatchParen",   { ctermfg = 3, cterm = { bold = true, underline = true } })
+  hl("DiagnosticError", { ctermfg = 1 })
+  hl("DiagnosticWarn",  { ctermfg = 3 })
+  hl("DiagnosticInfo",  { ctermfg = 4 })
+  hl("DiagnosticHint",  { ctermfg = 6 })
+  hl("IblIndent",    { ctermfg = 0 })
+  hl("IblScope",     { ctermfg = 8 })
+  hl("GitSignsAdd",    { ctermfg = 2 })
+  hl("GitSignsChange", { ctermfg = 3 })
+  hl("GitSignsDelete", { ctermfg = 1 })
+end
+vim.api.nvim_create_autocmd("ColorScheme", { callback = apply_hl })
+
+---------------------------------------------------------------- Plugin manager
+local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
+if not vim.uv.fs_stat(lazypath) then
+  vim.fn.system({ "git", "clone", "--filter=blob:none", "--branch=stable",
+    "https://github.com/folke/lazy.nvim.git", lazypath })
+end
+vim.opt.rtp:prepend(lazypath)
+
+require("lazy").setup({
+  { "nvim-tree/nvim-web-devicons", lazy = true },
+
+  { "nvim-lualine/lualine.nvim",
+    opts = {
+      options = { theme = "16color", globalstatus = true,
+        section_separators = "", component_separators = "│" },
+      tabline = {
+        lualine_a = { { "buffers", mode = 0, show_filename_only = true } },
+      },
+    } },
+
+  { "nvim-tree/nvim-tree.lua",
+    keys = { { "<leader>e", "<cmd>NvimTreeToggle<cr>", desc = "File tree" } },
+    opts = { view = { width = 30 }, renderer = { group_empty = true },
+      filters = { dotfiles = false } } },
+
+  { "nvim-telescope/telescope.nvim",
+    dependencies = { "nvim-lua/plenary.nvim" },
+    keys = {
+      { "<leader>ff", "<cmd>Telescope find_files<cr>", desc = "Files" },
+      { "<leader>fg", "<cmd>Telescope live_grep<cr>",  desc = "Grep" },
+      { "<leader>fb", "<cmd>Telescope buffers<cr>",    desc = "Buffers" },
+      { "<leader>fr", "<cmd>Telescope oldfiles<cr>",   desc = "Recent" },
+      { "<leader>fd", "<cmd>Telescope diagnostics<cr>", desc = "Diagnostics" },
+    } },
+
+  { "nvim-treesitter/nvim-treesitter", branch = "master", lazy = false,
+    build = ":TSUpdate",
+    config = function()
+      local langs = { "lua", "vim", "vimdoc", "bash", "python", "rust", "c",
+        "cpp", "javascript", "json", "toml", "markdown", "markdown_inline" }
+      local ok, configs = pcall(require, "nvim-treesitter.configs")
+      if ok then
+        configs.setup({ ensure_installed = langs,
+          highlight = { enable = true }, indent = { enable = true } })
+      else
+        local ok2, ts = pcall(require, "nvim-treesitter")
+        if ok2 and ts.install then ts.install(langs) end
+        vim.api.nvim_create_autocmd("FileType", {
+          callback = function() pcall(vim.treesitter.start) end })
+      end
+    end },
+
+  { "hrsh7th/nvim-cmp", event = "InsertEnter",
+    dependencies = { "hrsh7th/cmp-nvim-lsp", "hrsh7th/cmp-buffer", "hrsh7th/cmp-path" },
+    config = function()
+      local cmp = require("cmp")
+      local function next_item(fb)
+        if cmp.visible() then cmp.select_next_item() else fb() end
+      end
+      local function prev_item(fb)
+        if cmp.visible() then cmp.select_prev_item() else fb() end
+      end
+      cmp.setup({
+        snippet = { expand = function(a) vim.sn
