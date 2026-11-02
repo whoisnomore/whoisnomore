@@ -1,0 +1,163 @@
+sudo pacman -S --needed vim git curl fzf
+
+# Backup existing config
+[ -f ~/.vimrc ] && cp ~/.vimrc ~/.vimrc.backup
+
+# Install vim-plug
+curl -fLo ~/.vim/autoload/plug.vim --create-dirs \
+https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim
+
+# Create configuration
+cat > ~/.vimrc <<'EOF'
+" ==========================================
+"              VIM CONFIG
+"          Terminal Native Edition
+" ==========================================
+
+" General
+set nocompatible
+set encoding=utf-8
+set hidden
+set mouse=a
+set clipboard=unnamedplus
+set updatetime=300
+set timeoutlen=500
+set scrolloff=8
+set sidescrolloff=8
+set backspace=indent,eol,start
+
+" Terminal colors: inherit Kitty palette
+set termguicolors
+set background=dark
+syntax enable
+filetype plugin indent on
+
+" Never force a colorscheme
+highlight Normal guibg=NONE ctermbg=NONE
+highlight NonText guibg=NONE ctermbg=NONE
+highlight EndOfBuffer guibg=NONE ctermbg=NONE
+highlight SignColumn guibg=NONE ctermbg=NONE
+highlight VertSplit guibg=NONE ctermbg=NONE
+
+" Editor UI
+set number
+set relativenumber
+set cursorline
+set signcolumn=yes
+set ruler
+set showmatch
+set laststatus=2
+set noshowmode
+set cmdheight=1
+set wildmenu
+set wildmode=longest:full,full
+set lazyredraw
+set splitbelow
+set splitright
+set list
+set listchars=tab:»\ ,trail:·,extends:›,precedes:‹
+
+" Indentation
+set tabstop=4
+set shiftwidth=4
+set softtabstop=4
+set expandtab
+set smartindent
+set autoindent
+
+" Search
+set ignorecase
+set smartcase
+set incsearch
+set hlsearch
+
+" Plugin manager
+call plug#begin('~/.vim/plugged')
+
+Plug 'vim-airline/vim-airline'
+Plug 'vim-airline/vim-airline-themes'
+Plug 'preservim/nerdtree'
+Plug 'junegunn/fzf.vim'
+Plug 'airblade/vim-gitgutter'
+Plug 'jiangmiao/auto-pairs'
+
+call plug#end()
+
+" Airline
+let g:airline_powerline_fonts = 1
+let g:airline_theme = 'dark'
+let g:airline#extensions#branch#enabled = 1
+let g:airline#extensions#tabline#enabled = 1
+let g:airline#extensions#whitespace#enabled = 0
+
+" NERDTree
+let NERDTreeShowHidden = 1
+let NERDTreeMinimalUI = 1
+let NERDTreeWinSize = 28
+let NERDTreeQuitOnOpen = 1
+
+" GitGutter
+let g:gitgutter_enabled = 1
+set updatetime=250
+
+" FZF
+let g:fzf_layout = { 'down': '40%' }
+
+" Leader key
+let mapleader = " "
+
+" Navigation
+nnoremap <leader>e :NERDTreeToggle<CR>
+nnoremap <leader>f :Files<CR>
+nnoremap <leader>b :Buffers<CR>
+nnoremap <leader>g :GFiles<CR>
+nnoremap <leader>h :nohlsearch<CR>
+
+" Save and quit
+nnoremap <leader>w :w<CR>
+nnoremap <leader>q :q<CR>
+nnoremap <leader>x :x<CR>
+
+" Window navigation
+nnoremap <C-h> <C-w>h
+nnoremap <C-j> <C-w>j
+nnoremap <C-k> <C-w>k
+nnoremap <C-l> <C-w>l
+
+" Window resizing
+nnoremap <leader>+ :resize +3<CR>
+nnoremap <leader>- :resize -3<CR>
+
+" Better movement
+nnoremap J 5j
+nnoremap K 5k
+nnoremap n nzzzv
+nnoremap N Nzzzv
+
+" Keep selection while indenting
+vnoremap < <gv
+vnoremap > >gv
+
+" Quick terminal
+nnoremap <leader>t :terminal<CR>
+
+" Automatically return to normal mode
+tnoremap <Esc> <C-\><C-n>
+
+" Persistent undo
+set undofile
+set undodir=~/.vim/undo
+silent! call mkdir(expand('~/.vim/undo'), 'p')
+
+" Remember last cursor position
+autocmd BufReadPost *
+    \ if line("'\"") > 1 && line("'\"") <= line("$") |
+    \ exe "normal! g'\"" | endif
+
+" Clean up trailing whitespace on save
+autocmd BufWritePre * %s/\s\+$//e
+
+EOF
+
+# Install plugins
+vim +PlugInstall +qall
