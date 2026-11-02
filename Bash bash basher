@@ -1,0 +1,172 @@
+cat > ~/setup-vim.sh << 'SCRIPT'
+#!/usr/bin/env bash
+set -e
+
+echo "==> Installing packages"
+sudo pacman -S --needed --noconfirm vim git curl fzf ripgrep \
+  rust-analyzer clangd
+
+echo "==> Backing up old config"
+[ -f ~/.vimrc ] && cp ~/.vimrc ~/.vimrc.bak
+mkdir -p ~/.vim/undo ~/.vim/autoload
+
+echo "==> Installing vim-plug"
+curl -fLo ~/.vim/autoload/plug.vim --create-dirs \
+  https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim
+
+echo "==> Writing ~/.vimrc"
+cat > ~/.vimrc << 'EOF'
+" ---------------------------------------------------------------- Options
+set nocompatible
+syntax on
+filetype plugin indent on
+set notermguicolors            " follow the terminal palette
+set background=dark
+set number
+set norelativenumber           " absolute line numbers
+set numberwidth=4
+set cursorline
+set signcolumn=yes
+set mouse=a
+set ignorecase smartcase
+set expandtab shiftwidth=4 tabstop=4 smartindent
+set scrolloff=8
+set splitright splitbelow
+set undofile undodir=~/.vim/undo
+set updatetime=250
+set nowrap
+set hidden
+set incsearch hlsearch
+set wildmenu
+set laststatus=2
+set showtabline=2
+set fillchars=eob:\ 
+set listchars=tab:▏\ ,trail:·
+set list
+if has('clipboard')
+  set clipboard=unnamedplus
+endif
+
+let mapleader = " "
+
+" ---------------------------------------------------------------- Plugins
+call plug#begin('~/.vim/plugged')
+Plug 'preservim/nerdtree'
+Plug 'junegunn/fzf'
+Plug 'junegunn/fzf.vim'
+Plug 'airblade/vim-gitgutter'
+Plug 'tpope/vim-commentary'
+Plug 'jiangmiao/auto-pairs'
+Plug 'yegappan/lsp'
+call plug#end()
+
+" ---------------------------------------------------------------- LSP (rust-analyzer, clangd)
+autocmd User LspSetup call LspOptionsSet(#{
+      \ autoComplete: v:true,
+      \ autoHighlightDiags: v:true,
+      \ showDiagWithVirtualText: v:true,
+      \ })
+autocmd User LspSetup call LspAddServer([
+      \ #{name: 'rustanalyzer', filetype: ['rust'],
+      \   path: '/usr/bin/rust-analyzer', args: []},
+      \ #{name: 'clangd', filetype: ['c', 'cpp'],
+      \   path: '/usr/bin/clangd', args: ['--background-index']},
+      \ ])
+
+nnoremap gd         :LspGotoDefinition<CR>
+nnoremap K          :LspHover<CR>
+nnoremap <leader>rn :LspRename<CR>
+nnoremap <leader>ca :LspCodeAction<CR>
+nnoremap <leader>lf :LspFormat<CR>
+nnoremap <leader>d  :LspDiagCurrent<CR>
+
+" ---------------------------------------------------------------- Statusline and buffer tabline
+set statusline=%#StatusLine#\ %f\ %m%r%=%y\ \ %l:%c\ \ %p%%\ 
+
+function! BufLine() abort
+  let s = ''
+  for b in getbufinfo({'buflisted': 1})
+    let name = fnamemodify(b.name, ':t')
+    if empty(name) | let name = '[No Name]' | endif
+    let s .= (b.bufnr == bufnr('%') ? '%#TabLineSel#' : '%#TabLine#')
+    let s .= ' ' . name . (b.changed ? ' +' : '') . ' '
+  endfor
+  return s . '%#TabLineFill#'
+endfunction
+set tabline=%!BufLine()
+
+" ---------------------------------------------------------------- Highlights (ANSI 0-15 only)
+function! s:ApplyHl() abort
+  highlight Normal       ctermbg=NONE
+  highlight NonText      ctermfg=8 ctermbg=NONE
+  highlight SpecialKey   ctermfg=0 ctermbg=NONE
+  highlight SignColumn   ctermbg=NONE
+  highlight LineNr       ctermfg=8 ctermbg=NONE
+  highlight CursorLineNr ctermfg=3 ctermbg=NONE cterm=bold
+  highlight CursorLine   ctermbg=0 cterm=NONE
+  highlight Visual       ctermbg=8 ctermfg=NONE
+  highlight Search       ctermfg=0 ctermbg=3
+  highlight IncSearch    ctermfg=0 ctermbg=1
+  highlight Comment      ctermfg=8 cterm=italic
+  highlight StatusLine   ctermfg=7 ctermbg=0 cterm=NONE
+  highlight StatusLineNC ctermfg=8 ctermbg=0 cterm=NONE
+  highlight VertSplit    ctermfg=8 ctermbg=NONE cterm=NONE
+  highlight Pmenu        ctermfg=7 ctermbg=0
+  highlight PmenuSel     ctermfg=0 ctermbg=4
+  highlight MatchParen   ctermfg=3 ctermbg=NONE cterm=bold,underline
+  highlight TabLine      ctermfg=8 ctermbg=0 cterm=NONE
+  highlight TabLineSel   ctermfg=0 ctermbg=4 cterm=bold
+  highlight TabLineFill  ctermbg=NONE cterm=NONE
+  highlight GitGutterAdd          ctermfg=2 ctermbg=NONE
+  highlight GitGutterChange       ctermfg=3 ctermbg=NONE
+  highlight GitGutterDelete       ctermfg=1 ctermbg=NONE
+  highlight GitGutterChangeDelete ctermfg=3 ctermbg=NONE
+  highlight LspDiagVirtualTextError   ctermfg=1
+  highlight LspDiagVirtualTextWarning ctermfg=3
+  highlight LspDiagVirtualTextInfo    ctermfg=4
+  highlight LspDiagVirtualTextHint    ctermfg=6
+endfunction
+
+augroup TermColors
+  autocmd!
+  autocmd ColorScheme * call s:ApplyHl()
+augroup END
+
+colorscheme default
+call s:ApplyHl()
+
+" ---------------------------------------------------------------- Keymaps
+nnoremap <leader>e  :NERDTreeToggle<CR>
+nnoremap <leader>ff :Files<CR>
+nnoremap <leader>fg :Rg<CR>
+nnoremap <leader>fb :Buffers<CR>
+nnoremap <leader>fr :History<CR>
+nnoremap <Tab>      :bnext<CR>
+nnoremap <S-Tab>    :bprevious<CR>
+nnoremap <leader>x  :bdelete<CR>
+nnoremap <leader>w  :write<CR>
+nnoremap <leader>q  :quit<CR>
+nnoremap <silent> <Esc> :nohlsearch<CR>
+nnoremap <C-h> <C-w>h
+nnoremap <C-j> <C-w>j
+nnoremap <C-k> <C-w>k
+nnoremap <C-l> <C-w>l
+vnoremap < <gv
+vnoremap > >gv
+nnoremap <A-j> :m .+1<CR>==
+nnoremap <A-k> :m .-2<CR>==
+
+" ---------------------------------------------------------------- Autocmds
+" Restore cursor position
+autocmd BufReadPost * if line("'\"") > 1 && line("'\"") <= line("$") | exe "normal! g'\"" | endif
+" Strip trailing whitespace on save
+autocmd BufWritePre * let s:pos = getpos('.') | %s/\s\+$//e | call setpos('.', s:pos)
+EOF
+
+echo "==> Installing plugins"
+vim -es -u ~/.vimrc -i NONE -c "PlugInstall --sync" -c "qa" || true
+
+echo "==> Done. Launching vim"
+vim
+SCRIPT
+bash ~/setup-vim.sh
